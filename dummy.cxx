@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 					std::cout << "." << std::flush;
 					usleep(100 * 1024);
 				}
-			} catch (kol::SocketException e) {
+			} catch (kol::SocketException &e) {
 				sock.close();
 			}
 		}

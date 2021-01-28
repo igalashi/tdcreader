@@ -81,7 +81,7 @@ int reader(kol::TcpClient &tcp, int backend_id)
 		//const int bufsize = 16 * 1024 * sizeof(unsigned int);
 		try {
 			buf = new char[bufsize + sizeof(unsigned int)];
-		} catch (std::exception e){
+		} catch (std::exception &e){
 			std::cerr << "reader; Memory allocation fail. " << e.what() << std:: endl;
 			return -1;
 		}
@@ -93,7 +93,7 @@ int reader(kol::TcpClient &tcp, int backend_id)
 	
 		try {
 			tcp.read(data, bufsize);
-		} catch (kol::SocketException e) {
+		} catch (kol::SocketException &e) {
 			std::cerr << "#E tcp read err. " << e.what() << std::endl;
 			break;
 		}
@@ -157,7 +157,7 @@ int main (int argc, char *argv[])
 		kol::TcpClient tcp(host, port);
 		reader(tcp, backend_id);
 		tcp.close();
-	} catch(kol::SocketException e) {
+	} catch(kol::SocketException &e) {
 		std::cout << "Socket open error. (" << host << ", " << port
 			<< ") "  << e.what() << std::endl;
 		return 1;
