@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 				sock.close();
 			}
 		}
-	} catch(kol::SocketException e) {
+	} catch(kol::SocketException &e) {
 		std::cout << "Error " << e.what() << std::endl;
 	}
 
