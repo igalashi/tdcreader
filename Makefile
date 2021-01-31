@@ -41,3 +41,6 @@ kol/kollib.a:
 
 clean:
 	rm -f $(PROGS)
+
+cleandata:
+	rm -f tdc*.dat

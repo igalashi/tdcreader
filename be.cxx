@@ -54,7 +54,7 @@ int reader(int port)
 
 	std::vector<struct ebbuf> buf;
 	int nread_flagment = 0;
-	int spillcount = 1;
+	int spillcount = 0;
 	while (true) {
 
 		receiver.recv(&message);
@@ -87,12 +87,40 @@ int reader(int port)
 		std::cout << std::endl;
 		*/
 
+		while (data_size > 0) {
+			bool is_spill_end = false;
+			for (unsigned int i = 0 ; i < (data_size /sizeof(unsigned int)) ; i++) {
+				if (data[i] == 0xffff5555) {
+					time_t now = time(NULL);
+					ofs.write(reinterpret_cast<char *>(data), sizeof(unsigned int) * (i + 1));
+					ofs.write(reinterpret_cast<char *>(&now), sizeof(time_t));
+					data = &(data[i + 1]);
+					data_size = data_size - ((i + 1) * sizeof(unsigned int));
+					spillcount++;
+					if ((spillcount % nspill) == 0) {
+						char wfname[128];
+						ofs.close();
+						strncpy(wfname, filename(), 128);
+						ofs.open(wfname, std::ios::out);
+						std::cout << wfname << std::endl;
+					}
+					is_spill_end = true;
+				}
+			}
+			if (! is_spill_end) {
+				ofs.write(reinterpret_cast<char *>(data), data_size);
+				break;
+			}
+		}
+
+
+		#if 0
 		for (unsigned int i = 0 ; i < (data_size / sizeof(unsigned int)) ; i++) {
 			if (data[i] == 0xffff5555) {
 				time_t now = time(NULL);
 				ofs.write(reinterpret_cast<char *>(&(data[i])), sizeof(unsigned int));
-				std::cout << "#D sizeof time_t " << sizeof(time_t) << std::endl;
 				ofs.write(reinterpret_cast<char *>(&now), sizeof(time_t));
+				spillcount++;
 				if ((spillcount % nspill) == 0) {
 					char wfname[128];
 					ofs.close();
@@ -100,14 +128,11 @@ int reader(int port)
 					ofs.open(wfname, std::ios::out);
 					std::cout << wfname << std::endl;
 				}
-				spillcount++;
-
 			} else {
 				ofs.write(reinterpret_cast<char *>(&(data[i])), sizeof(unsigned int));
 			}
 		}
-		//ofs.write(cdata, datasize);
-
+		#endif
 
 		
 		if ((nread_flagment % 1000) == 0) {
@@ -124,6 +149,8 @@ int reader(int port)
 
 		nread_flagment++;
 	}
+
+	ofs.close();
 
 	return 0;
 }

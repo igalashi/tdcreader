@@ -34,6 +34,10 @@ int main(int argc, char *argv[])
 		for (int i = 0 ; i < buf_size ; i++) {
 			buf[i] = i & 0xff;
 		}
+		buf[3] = 0xba;
+		buf[2] = 0xbe;
+		buf[1] = 0xca;
+		buf[0] = 0xfe;
 		buf[buf_size - 4] = 0x55;
 		buf[buf_size - 3] = 0x55;
 		buf[buf_size - 2] = 0xff;

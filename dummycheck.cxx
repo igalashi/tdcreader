@@ -56,12 +56,18 @@ int reading()
 #else
 	
 #endif
+
+	uint32_t data;
+	std::cin.read(reinterpret_cast<char *>(&data), sizeof(uint32_t));
+	std::cout << "HEAD: " << std::hex << data << std::endl;
+
+	uint32_t prev_data = 0x00000000;
 	while (! std::cin.eof()) {
-		uint32_t data;
 		char *cdata = reinterpret_cast<char *>(&data);
 		std::cin.read(reinterpret_cast<char *>(&data), sizeof(uint32_t));
 		if (std::cin.eof()) break;
 		//if (std::cin.gcount() == 0) break;
+
 		nread += std::cin.gcount();
 		if (data == 0xffff5555) {
 			std::cout << "Gate end, Nread: " << std::dec << nread
@@ -74,9 +80,17 @@ int reading()
 			&& ((cdata[2] - cdata[1]) != 1)
 			&& ((cdata[3] - cdata[2]) != 1)) {
 			std::cout << "#E " << std::hex << data << std::endl;
+			if (prev_data != 0x00000000) {
+				int p = (prev_data >> 24) & 0xff;
+				int n = data & 0xff;
+				if ((n -p) != 1) {
+					std::cout << "#E " << std::hex
+						<< prev_data << " " << data
+						<< std::endl;
+				}
+			}
 		}
-
-
+		prev_data = data;
 	}
 
 	return 0;
