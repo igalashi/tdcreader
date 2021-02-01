@@ -23,35 +23,6 @@
 //const int bufsize = 16 * 1024 * sizeof(unsigned int);
 const int bufsize = 1024 * sizeof(unsigned int);
 
-int fe_init()
-{
-	return 0;
-}
-
-int fe_begin_of_run()
-{
-	return 0;
-}
-
-int fe_wait()
-{
-	return 0;
-}
-
-int fe_read()
-{
-	return 0;
-}
-
-int fe_end_of_run()
-{
-	return 0;
-}
-
-int fe_finish()
-{
-	return 0;
-}
 
 unsigned int id = 0;
 int g_depth = 0;
@@ -77,7 +48,7 @@ int reader(kol::TcpClient &tcp, int backend_id)
 	//sender.connect("ipc://./hello");
 	sender.connect(zportname(backend_id));
 
-	int evnum = 0;
+	int segnum = 0;
 	while (1) {
 		char *buf;
 		//usleep(100000);
@@ -111,14 +82,18 @@ int reader(kol::TcpClient &tcp, int backend_id)
 			NULL);
 		sender.send(message);
 	
-		//std::cout << "." << std::flush;
-		std::cout << "\r" << g_depth << "   " << std::flush;
+		#if 1
+		if ((segnum % 1000) == 0) {
+			std::cout << "\r" << g_depth << "   " << std::flush;
+		}
+		#endif
 
-		evnum++;
+		segnum++;
 	}
 
 	return 0;
 }
+#include "fe_printhelp.cxx"
 
 int main (int argc, char *argv[])
 {
@@ -146,6 +121,11 @@ int main (int argc, char *argv[])
 		}
 		if ((sargv == "-b") && (argc > i)) {
 			backend_id = strtol(argv[i + 1], NULL, 0);
+		}
+
+		if (sargv == "--help") {
+			fe_printhelp(argv);
+			return 0;
 		}
 	}
 

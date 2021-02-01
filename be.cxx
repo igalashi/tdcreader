@@ -13,13 +13,13 @@
 #include <vector>
 #include <deque>
 
-#if 1
-#include "filename.cxx"
-#else
+#if 0
 const char *filename(int id)
 {
 	return "/dev/null";
 }
+#else
+#include "filename.cxx"
 #endif
 
 #include "zportname.cxx"
@@ -178,6 +178,8 @@ int reader(int port)
 	return 0;
 }
 
+#include "be_printhelp.cxx"
+
 int main (int argc, char *argv[])
 {
 	//int port = 5558;
@@ -190,6 +192,10 @@ int main (int argc, char *argv[])
 		}
 		if ((sargv == "-p") && (argc > i)) {
 			port = strtol(argv[i + 1], NULL, 0);
+		}
+		if ((sargv == "-h") || (sargv == "--help")) {
+			be_printhelp(argv);
+			return 0;
 		}
 	}
 
