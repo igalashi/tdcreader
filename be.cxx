@@ -16,14 +16,14 @@
 #if 1
 #include "filename.cxx"
 #else
-const char *filename()
+const char *filename(int id)
 {
 	return "/dev/null";
 }
 #endif
 
 #include "zportname.cxx"
-
+#include "mstopwatch.cxx"
 
 struct ebbuf {
 	unsigned int id;
@@ -40,6 +40,12 @@ int reader(int port)
 {
 	zmq::context_t context(1);
 	zmq::socket_t receiver(context, ZMQ_PULL);
+
+	//receiver.setsockopt(ZMQ_RCVBUF, 16 * 1024);
+	//receiver.setsockopt(ZMQ_RCVHWM, 1000);
+	std::cout << "ZMQ_RCVBUF : " << receiver.getsockopt<int>(ZMQ_RCVBUF) << std::endl;
+	std::cout << "ZMQ_RCVHWM : " << receiver.getsockopt<int>(ZMQ_RCVHWM) << std::endl;
+
 	//receiver.bind("tcp://*:5558");
 	//receiver.bind("ipc://./hello");
 	receiver.bind(zportname(port));
@@ -47,10 +53,14 @@ int reader(int port)
 	zmq::message_t message;
 
 	char wfname[128];
-	strncpy(wfname, filename(), 128);
+	strncpy(wfname, filename(port), 128);
 	std::ofstream ofs;
 	ofs.open(wfname, std::ios::out);
 	std::cout << wfname << std::endl;
+
+	mStopWatch sw;
+	sw.start();
+	int wcount = 0;
 
 	std::vector<struct ebbuf> buf;
 	int nread_flagment = 0;
@@ -97,18 +107,31 @@ int reader(int port)
 					data = &(data[i + 1]);
 					data_size = data_size - ((i + 1) * sizeof(unsigned int));
 					spillcount++;
+					wcount += sizeof(unsigned int) * (i + 1) + sizeof(time_t);
+
 					if ((spillcount % nspill) == 0) {
 						char wfname[128];
 						ofs.close();
-						strncpy(wfname, filename(), 128);
+						
+						int elapse = sw.elapse();
+						sw.start();
+						double wspeed = static_cast<double>(wcount)
+							/ 1024 / 1024
+							* 1000 / static_cast<double>(elapse);
+						std::cout << wfname << " "
+							<< wcount << " B " << elapse << " ms "
+							<< wspeed << " MiB/s"  << std::endl;
+
+						wcount = 0;
+						strncpy(wfname, filename(port), 128);
 						ofs.open(wfname, std::ios::out);
-						std::cout << wfname << std::endl;
 					}
 					is_spill_end = true;
 				}
 			}
 			if (! is_spill_end) {
 				ofs.write(reinterpret_cast<char *>(data), data_size);
+				wcount += data_size;
 				break;
 			}
 		}
@@ -157,7 +180,6 @@ int reader(int port)
 
 int main (int argc, char *argv[])
 {
-	//int id = 0;
 	//int port = 5558;
 	int port = 0;
 

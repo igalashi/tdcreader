@@ -7,8 +7,9 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <iomanip>
 
-char *filename()
+char *filename(int id)
 {
 	static char fname[128];
 	
@@ -48,6 +49,8 @@ char *filename()
 
 	std::ostringstream oss;
 	oss << "tdc"
+		<< std::setfill('0') << std::setw(4) << id << std::setfill(' ') 
+		<< "_"
 		<< (lt->tm_year + 1900) << ossmonth.str() << ossday.str()
 		<< osshour.str() << ossmin.str() << osssec.str();
 

@@ -18,11 +18,8 @@ all: $(PROGS)
 fe: fe.cxx zportname.cxx kol/kollib.a
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
 
-be: be.cxx
+be: be.cxx filename.cxx zportname.cxx  mstopwatch.cxx
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
-
-eb: eb.cxx filename.cxx zportname.cxx
-	$(CXX) $(CXXFLAGS) -o $@ $< $(CXXLIBS)
 
 fctreader: fctreader.cxx
 	$(CXX) $(CXXFLAGS) -o $@ \

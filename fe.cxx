@@ -69,7 +69,10 @@ int reader(kol::TcpClient &tcp, int backend_id)
 	zmq::context_t context(1);
 
 	zmq::socket_t sender(context, ZMQ_PUSH);
-	//sender.setsockopt(ZMQ_SNDBUF, 128);
+	//sender.setsockopt(ZMQ_SNDBUF, bufsize +  2);
+	sender.setsockopt(ZMQ_SNDHWM, 512*1024);
+	std::cout << "ZMQ_SNDBUF : " << sender.getsockopt<int>(ZMQ_SNDBUF) << std::endl;
+	std::cout << "ZMQ_SNDHWM : " << sender.getsockopt<int>(ZMQ_SNDHWM) << std::endl;
 	//sender.connect("tcp://localhost:5558");
 	//sender.connect("ipc://./hello");
 	sender.connect(zportname(backend_id));
