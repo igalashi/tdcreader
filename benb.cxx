@@ -13,7 +13,7 @@
 #include <vector>
 #include <deque>
 
-#if 0
+#if 1
 const char *filename(int id)
 {
 	return "/dev/null";
@@ -67,10 +67,19 @@ int reader(int port)
 	int spillcount = 0;
 	while (true) {
 
+
+		bool rc;
 		try {
-			receiver.recv(&message);
+			rc = receiver.recv(&message, ZMQ_NOBLOCK);
 		} catch (zmq::error_t &e) {
 			std::cerr << "#E reader zmq err. " << e.what() << std::endl;
+			continue;
+		}
+		//std::cout << rc << std::flush;
+		if (rc) {
+		} else {
+			usleep(1000);
+			continue;
 		}
 
 		unsigned int *head = reinterpret_cast<unsigned int *>(message.data());

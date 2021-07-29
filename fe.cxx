@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <atomic>
 
 #include <cstdio>
 #include <cstring>
@@ -25,7 +26,7 @@ const int bufsize = 1024 * sizeof(unsigned int);
 
 
 unsigned int id = 0;
-int g_depth = 0;
+std::atomic<int> g_depth(0);
 
 void buf_free(void *buf, void *hint)
 {
@@ -83,7 +84,7 @@ int reader(kol::TcpClient &tcp, int backend_id)
 		sender.send(message);
 	
 		#if 1
-		if ((segnum % 1000) == 0) {
+		if ((segnum % 100) == 0) {
 			std::cout << "\r" << g_depth << "   " << std::flush;
 		}
 		#endif

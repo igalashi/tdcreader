@@ -1,29 +1,97 @@
 /*
  *
- *
  */
 
-#include <zmq.hpp>
-#include <time.h>
-#include <sys/time.h>
 #include <iostream>
-#include <iomanip>
-#include <fstream>
+#include <thread>
 
-#include <vector>
-#include <deque>
+#include <cstdio>
+#include <cstring>
+#include <unistd.h>
+
+#include "zmq.hpp"
+#include "koltcp.h"
+
+
+#include "daqtask.cxx"
+#include "mstopwatch.cxx"
+#include "filename.cxx"
+
+const char* g_rec_endpoint = "tcp://*:5558";
+//const char* g_rec_endpoint = "ipc://./hello";
+//const char* g_rec_endpoint = "inproc://hello";
+
+
+class DTrear : public DAQTask
+{
+public:
+	DTrear(int i) : DAQTask(i) {};
+protected:
+	//virtual void state_machine(void *) override;
+	virtual int st_init(void *) override;
+	virtual int st_idle(void *) override;
+	virtual int st_running(void *) override;
+private:
+};
 
 #if 0
-const char *filename(int id)
+void DTrear::state_machine(void *context)
 {
-	return "/dev/null";
+	c_dtmtx->lock();
+	std::cout << "#rear sm start# " << m_id << " : " << c_state << std::endl;
+	c_dtmtx->unlock();
+
+	while(true) {
+		switch (c_state) {
+			case SM_INIT :
+				if (!m_is_done) {
+					st_init(context);
+				} else {
+					usleep(1000);
+				}
+				m_is_done = true;
+				break;
+
+			case SM_IDLE :
+				usleep(1);
+				st_idle(context);
+				break;
+
+			case SM_RUNNING :
+				st_running(context);
+				break;
+		}
+		if (c_state == SM_END) break;
+	}
+
+	std::cout << "Task:" << m_id << " end." << std::endl;
+
+	return;
 }
-#else
-#include "filename.cxx"
 #endif
 
-#include "zportname.cxx"
-#include "mstopwatch.cxx"
+int DTrear::st_init(void *context)
+{
+	{
+		std::lock_guard<std::mutex> lock(*c_dtmtx);
+		std::cout << "rear(" << m_id << ") init" << std::endl;
+	}
+
+
+	return 0;
+}
+
+int DTrear::st_idle(void *context)
+{
+	{
+		std::lock_guard<std::mutex> lock(*c_dtmtx);
+		std::cout << "rear(" << m_id << ") idle" << std::endl;
+	}
+	usleep(100000);
+
+	return 0;
+}
+
 
 struct ebbuf {
 	unsigned int id;
@@ -32,26 +100,29 @@ struct ebbuf {
 	int prev_en;
 };
 
-
 static int nspill = 1;
 
-
-int reader(int port)
+int DTrear::st_running(void *context)
 {
-	zmq::context_t context(1);
-	zmq::socket_t receiver(context, ZMQ_PULL);
+	{
+		std::lock_guard<std::mutex> lock(*c_dtmtx);
+		std::cout << "rear(" << m_id << ") running" << std::endl;
+	}
+
+	zmq::socket_t receiver(
+		*(reinterpret_cast<zmq::context_t *>(context)),
+		ZMQ_PULL);
 
 	//receiver.setsockopt(ZMQ_RCVBUF, 16 * 1024);
 	//receiver.setsockopt(ZMQ_RCVHWM, 1000);
-	std::cout << "ZMQ_RCVBUF : " << receiver.getsockopt<int>(ZMQ_RCVBUF) << std::endl;
-	std::cout << "ZMQ_RCVHWM : " << receiver.getsockopt<int>(ZMQ_RCVHWM) << std::endl;
+	std::cout << "rear: ZMQ_RCVBUF : " << receiver.getsockopt<int>(ZMQ_RCVBUF) << std::endl;
+	std::cout << "rear: ZMQ_RCVHWM : " << receiver.getsockopt<int>(ZMQ_RCVHWM) << std::endl;
 
-	//receiver.bind("tcp://*:5558");
-	//receiver.bind("ipc://./hello");
-	receiver.bind(zportname(port));
+	receiver.bind(g_rec_endpoint);
 
 	zmq::message_t message;
 
+	int port = 111;
 	char wfname[128];
 	strncpy(wfname, filename(port), 128);
 	std::ofstream ofs;
@@ -67,10 +138,23 @@ int reader(int port)
 	int spillcount = 0;
 	while (true) {
 
+
+		//if (c_state != SM_RUNNING) break;
+		if ((c_state != SM_RUNNING) && (g_avant_depth <= 0)) break;
+
+		bool rc;
 		try {
-			receiver.recv(&message);
+			rc = receiver.recv(&message, ZMQ_NOBLOCK);
 		} catch (zmq::error_t &e) {
-			std::cerr << "#E reader zmq err. " << e.what() << std::endl;
+			std::cerr << "#E rear_run zmq recv err. " << e.what() << std::endl;
+			//break;
+			continue;
+		}
+		//std::cout << rc  << std::flush;
+		if (rc) {
+		} else {
+			usleep(100);
+			continue;
 		}
 
 		unsigned int *head = reinterpret_cast<unsigned int *>(message.data());
@@ -142,26 +226,6 @@ int reader(int port)
 
 
 		#if 0
-		for (unsigned int i = 0 ; i < (data_size / sizeof(unsigned int)) ; i++) {
-			if (data[i] == 0xffff5555) {
-				time_t now = time(NULL);
-				ofs.write(reinterpret_cast<char *>(&(data[i])), sizeof(unsigned int));
-				ofs.write(reinterpret_cast<char *>(&now), sizeof(time_t));
-				spillcount++;
-				if ((spillcount % nspill) == 0) {
-					char wfname[128];
-					ofs.close();
-					strncpy(wfname, filename(), 128);
-					ofs.open(wfname, std::ios::out);
-					std::cout << wfname << std::endl;
-				}
-			} else {
-				ofs.write(reinterpret_cast<char *>(&(data[i])), sizeof(unsigned int));
-			}
-		}
-		#endif
-
-		
 		if ((nread_flagment % 1000) == 0) {
 			std::cout << "\rID : ";
 			for (unsigned int i = 0 ; i < buf.size() ;i++) {
@@ -173,6 +237,7 @@ int reader(int port)
 		} else {
 			//std::cout << "." << std::flush;
 		}
+		#endif
 
 		nread_flagment++;
 	}
@@ -180,30 +245,5 @@ int reader(int port)
 	ofs.close();
 
 	return 0;
-}
 
-#include "be_printhelp.cxx"
-
-int main (int argc, char *argv[])
-{
-	//int port = 5558;
-	int port = 0;
-
-	for (int i = 1 ; i < argc ; i++) {
-		std::string sargv(argv[i]);
-		if ((sargv == "-s") && (argc > i)) {
-			nspill = strtol(argv[i + 1], NULL, 0);
-		}
-		if ((sargv == "-p") && (argc > i)) {
-			port = strtol(argv[i + 1], NULL, 0);
-		}
-		if ((sargv == "-h") || (sargv == "--help")) {
-			be_printhelp(argv);
-			return 0;
-		}
-	}
-
-	reader(port);
-
-	return 0;
 }

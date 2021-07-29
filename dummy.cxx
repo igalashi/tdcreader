@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 				while (true) {
 					sock.write(buf, buf_size);
 					std::cout << "." << std::flush;
-					usleep(100 * 1024);
+					usleep(100 * 1000);
 				}
 			} catch (kol::SocketException &e) {
 				sock.close();
