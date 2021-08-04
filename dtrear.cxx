@@ -15,23 +15,29 @@
 
 #include "daqtask.cxx"
 #include "mstopwatch.cxx"
-#include "filename.cxx"
+#include "dtfilename.cxx"
 
-const char* g_rec_endpoint = "tcp://*:5558";
+//const char* g_rec_endpoint = "tcp://*:5558";
 //const char* g_rec_endpoint = "ipc://./hello";
 //const char* g_rec_endpoint = "inproc://hello";
+
+const char* fnhead = "tdc";
 
 
 class DTrear : public DAQTask
 {
 public:
-	DTrear(int i) : DAQTask(i) {};
+	DTrear(int i) : DAQTask(i), m_nspill(1) {};
+	int get_nspill() {return m_nspill;};
+	void set_nspill(int i) {m_nspill = i;};
 protected:
 	//virtual void state_machine(void *) override;
 	virtual int st_init(void *) override;
 	virtual int st_idle(void *) override;
 	virtual int st_running(void *) override;
 private:
+	int write_data(char*, int);
+	int m_nspill;
 };
 
 #if 0
@@ -77,16 +83,17 @@ int DTrear::st_init(void *context)
 		std::cout << "rear(" << m_id << ") init" << std::endl;
 	}
 
-
 	return 0;
 }
 
 int DTrear::st_idle(void *context)
 {
+	#if 0
 	{
 		std::lock_guard<std::mutex> lock(*c_dtmtx);
 		std::cout << "rear(" << m_id << ") idle" << std::endl;
 	}
+	#endif
 	usleep(100000);
 
 	return 0;
@@ -100,7 +107,7 @@ struct ebbuf {
 	int prev_en;
 };
 
-static int nspill = 1;
+//static int nspill = 1;
 
 int DTrear::st_running(void *context)
 {
@@ -122,22 +129,25 @@ int DTrear::st_running(void *context)
 
 	zmq::message_t message;
 
-	int port = 111;
 	char wfname[128];
-	strncpy(wfname, filename(port), 128);
+	strncpy(wfname, dtfilename(fnhead), 128);
 	std::ofstream ofs;
+	#if 000
 	ofs.open(wfname, std::ios::out);
 	std::cout << wfname << std::endl;
+	#endif
 
 	mStopWatch sw;
 	sw.start();
-	int wcount = 0;
 
 	std::vector<struct ebbuf> buf;
 	int nread_flagment = 0;
+	#if 000
+	int wcount = 0;
 	int spillcount = 0;
-	while (true) {
+	#endif
 
+	while (true) {
 
 		//if (c_state != SM_RUNNING) break;
 		if ((c_state != SM_RUNNING) && (g_avant_depth <= 0)) break;
@@ -150,18 +160,37 @@ int DTrear::st_running(void *context)
 			//break;
 			continue;
 		}
-		//std::cout << rc  << std::flush;
-		if (rc) {
-		} else {
+		if (! rc) {
 			usleep(100);
 			continue;
 		}
 
+
 		unsigned int *head = reinterpret_cast<unsigned int *>(message.data());
+		#if 000
 		unsigned int *data = head + 1;
-		//char *cdata =  reinterpret_cast<char *>(head + 1);
-		unsigned int id =  (*head) & 0x000000ff;
+		#endif
+		char *cdata =  reinterpret_cast<char *>(head + 1);
+		unsigned int id = (*head) & 0x000000ff;
 		unsigned int data_size = message.size() - sizeof(unsigned int);
+
+		#if 0
+		{
+		std::lock_guard<std::mutex> lock(*c_dtmtx);
+		std::cout << std::endl << "### size: " << std::dec << data_size
+			<< " header: " << std::hex<< head[0];
+		for (int i = 0 ; i < 32 ; i++) {
+			if ((i % 8) == 0) std::cout << std:: endl;
+			std::cout << " " << std::hex << std::setw(8) << data[i] ;
+		}
+		std::cout << std::endl << "-";
+		unsigned int isize  = data_size / sizeof(unsigned int);
+		for (unsigned int i = isize - 16 ; i < isize ; i++) {
+			if ((i % 8) == 0) std::cout << std:: endl;
+			std::cout << " " << std::hex << std::setw(8) << data[i] ;
+		}
+		}
+		#endif
 
 		bool is_new = true;
 		for (unsigned int i = 0 ; i < buf.size() ; i++) {
@@ -177,27 +206,29 @@ int DTrear::st_running(void *context)
 			buf.push_back(node);
 		}
 
-		/*
+		#if 0
 		std::cout << "#" << std::hex << id << " " << *head;
 		for (int i = 0 ; i < 8 ; i++) {
 			std::cout << " " << data[i];
 		}
 		std::cout << std::endl;
-		*/
+		#endif
 
+		#if 000
 		while (data_size > 0) {
 			bool is_spill_end = false;
-			for (unsigned int i = 0 ; i < (data_size /sizeof(unsigned int)) ; i++) {
+			for (unsigned int i = 0 ; i < (data_size / sizeof(unsigned int)) ; i++) {
 				if (data[i] == 0xffff5555) {
 					time_t now = time(NULL);
-					ofs.write(reinterpret_cast<char *>(data), sizeof(unsigned int) * (i + 1));
+					ofs.write(reinterpret_cast<char *>(data),
+						sizeof(unsigned int) * (i + 1));
 					ofs.write(reinterpret_cast<char *>(&now), sizeof(time_t));
 					data = &(data[i + 1]);
 					data_size = data_size - ((i + 1) * sizeof(unsigned int));
 					spillcount++;
 					wcount += sizeof(unsigned int) * (i + 1) + sizeof(time_t);
 
-					if ((spillcount % nspill) == 0) {
+					if ((spillcount % m_nspill) == 0) {
 						char wfname[128];
 						ofs.close();
 						
@@ -211,7 +242,7 @@ int DTrear::st_running(void *context)
 							<< wspeed << " MiB/s"  << std::endl;
 
 						wcount = 0;
-						strncpy(wfname, filename(port), 128);
+						strncpy(wfname, dtfilename(fnhead), 128);
 						ofs.open(wfname, std::ios::out);
 					}
 					is_spill_end = true;
@@ -223,7 +254,9 @@ int DTrear::st_running(void *context)
 				break;
 			}
 		}
-
+		#else
+		write_data(cdata, data_size);
+		#endif
 
 		#if 0
 		if ((nread_flagment % 1000) == 0) {
@@ -245,5 +278,68 @@ int DTrear::st_running(void *context)
 	ofs.close();
 
 	return 0;
+
+}
+
+int DTrear::write_data(char *cdata, int data_size)
+{
+	unsigned int *data = reinterpret_cast<unsigned int *>(cdata);
+
+	static int spillcount = 0;
+	static int wcount = 0;
+	static mStopWatch sw;
+
+
+	static std::ofstream ofs;
+
+	if (! ofs.is_open()) {
+		char wfname[128];
+		strncpy(wfname, dtfilename(fnhead), 128);
+		ofs.open(wfname, std::ios::out);
+		std::cout << wfname << std::endl;
+		sw.start();
+	}
+
+	while (data_size > 0) {
+		bool is_spill_end = false;
+		for (unsigned int i = 0 ; i < (data_size / sizeof(unsigned int)) ; i++) {
+			if (data[i] == 0xffff5555) {
+				time_t now = time(NULL);
+				ofs.write(reinterpret_cast<char *>(data),
+					sizeof(unsigned int) * (i + 1));
+				ofs.write(reinterpret_cast<char *>(&now), sizeof(time_t));
+				data = &(data[i + 1]);
+				data_size = data_size - ((i + 1) * sizeof(unsigned int));
+				spillcount++;
+				wcount += sizeof(unsigned int) * (i + 1) + sizeof(time_t);
+
+				if ((spillcount % m_nspill) == 0) {
+					char wfname[128];
+					ofs.close();
+
+					int elapse = sw.elapse();
+					sw.start();
+					double wspeed = static_cast<double>(wcount)
+						/ 1024 / 1024
+						* 1000 / static_cast<double>(elapse);
+					std::cout << wfname << " "
+						<< wcount << " B " << elapse << " ms "
+						<< wspeed << " MiB/s"  << std::endl;
+
+					wcount = 0;
+					strncpy(wfname, dtfilename(fnhead), 128);
+					ofs.open(wfname, std::ios::out);
+				}
+				is_spill_end = true;
+			}
+		}
+		if (! is_spill_end) {
+			ofs.write(reinterpret_cast<char *>(data), data_size);
+			wcount += data_size;
+			break;
+		}
+	}
+
+	return data_size;
 
 }

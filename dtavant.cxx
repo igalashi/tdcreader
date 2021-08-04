@@ -18,13 +18,13 @@
 
 
 
-const int bufsize = 1024 * sizeof(unsigned int);
+//const int bufsize = 1024 * sizeof(unsigned int);
+const int default_bufsize = 128;
 
-unsigned int id = 0;
 std::atomic<int> g_avant_depth(0);
 
 
-const char* g_snd_endpoint = "tcp://localhost:5558";
+//const char* g_snd_endpoint = "tcp://localhost:5558";
 //const char* g_snd_endpoint = "ipc://./hello";
 //const char* g_snd_endpoint = "inproc://hello";
 
@@ -42,6 +42,8 @@ class DTavant : public DAQTask
 public:
 	DTavant(int i) : DAQTask(i) {};
 	DTavant(int, char *, int, bool);
+	int get_bufsize() {return m_bufsize;};
+	void set_bufsize(int size) {m_bufsize = size;};
 protected:
 	virtual int st_init(void *) override;
 	virtual int st_idle(void *) override;
@@ -51,10 +53,12 @@ private:
 	int m_port;
 	kol::TcpClient *tcp;
 	bool m_is_dummy;
+	int m_bufsize;
 };
 
 DTavant::DTavant(int i, char *host, int port, bool is_dummy)
-	: DAQTask(i), m_host(host), m_port(port), m_is_dummy(is_dummy)
+	: DAQTask(i), m_host(host), m_port(port),
+		m_is_dummy(is_dummy), m_bufsize(default_bufsize)
 {
 }
 
@@ -72,6 +76,7 @@ int DTavant::st_init(void *context)
 			std::lock_guard<std::mutex> lock(*c_dtmtx);
 			std::cout << "Socket open error. (" << m_host << ", " << m_port
 				<< ") "  << e.what() << std::endl;
+			m_is_good = false;
 			return 1;
 		}
 	} else {
@@ -84,10 +89,12 @@ int DTavant::st_init(void *context)
 
 int DTavant::st_idle(void *context)
 {
+	#if 0
 	{
 		std::lock_guard<std::mutex> lock(*c_dtmtx);
 		std::cout << "avant(" << m_id << ") idle" << std::endl;
 	}
+	#endif
 	usleep(100000);
 
 	return 0;
@@ -103,7 +110,7 @@ int DTavant::st_running(void *context)
 	zmq::socket_t sender(
 		*(reinterpret_cast<zmq::context_t *>(context)),
 		ZMQ_PUSH);
-	//sender.setsockopt(ZMQ_SNDBUF, bufsize +  2);
+	//sender.setsockopt(ZMQ_SNDBUF, m_bufsize +  2);
 	//sender.setsockopt(ZMQ_SNDHWM, 512*1024);
 	std::cout << "avant: ZMQ_SNDBUF : " << sender.getsockopt<int>(ZMQ_SNDBUF) << std::endl;
 	std::cout << "avant: ZMQ_SNDHWM : " << sender.getsockopt<int>(ZMQ_SNDHWM) << std::endl;
@@ -118,7 +125,7 @@ int DTavant::st_running(void *context)
 
 		char *buf;
 		try {
-			buf = new char[bufsize + sizeof(unsigned int)];
+			buf = new char[m_bufsize + sizeof(unsigned int)];
 		} catch (std::exception &e){
 			std::lock_guard<std::mutex> lock(*c_dtmtx);
 			std::cerr << "avant; Memory allocation fail. " << e.what() << std:: endl;
@@ -127,13 +134,13 @@ int DTavant::st_running(void *context)
 		g_avant_depth++;
 
 		unsigned int *head = reinterpret_cast<unsigned int *>(buf);
-		*head = 0xff000000 | id;
+		*head = 0xff000000 | m_id;
 		char *data = reinterpret_cast<char *>(head + 1);
 	
 		int nread = 0;
 		if (! m_is_dummy) {
 			try {
-				tcp->read(data, bufsize);
+				tcp->read(data, m_bufsize);
 			} catch (kol::SocketException &e) {
 				std::lock_guard<std::mutex> lock(*c_dtmtx);
 				std::cerr << "#E tcp read err. " << e.what() << std::endl;
@@ -141,8 +148,8 @@ int DTavant::st_running(void *context)
 			}
 			nread = tcp->gcount();
 		} else {
-			for (int i = 0 ; i  < bufsize ; i++) data[i] = i & 0xff;
-			nread = bufsize + sizeof(unsigned int);
+			for (int i = 0 ; i < m_bufsize ; i++) data[i] = i & 0xff;
+			nread = m_bufsize;
 		}
 
 		zmq::message_t message(
@@ -166,7 +173,6 @@ int DTavant::st_running(void *context)
 
 		segnum++;
 	}
-
 
 
 	return 0;

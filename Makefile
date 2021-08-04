@@ -37,7 +37,7 @@ benb: benb.cxx filename.cxx zportname.cxx  mstopwatch.cxx
 daqtask: daqtask.cxx
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -D TEST_MAIN -o $@ $< $(CXXLIBS) $(LIBS)
 
-dtmain: dtmain.cxx daqtask.cxx dtavant.cxx dtrear.cxx
+dtmain: dtmain.cxx daqtask.cxx dtavant.cxx dtrear.cxx dtfilename.cxx
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
 
 dummy: dummy.cxx

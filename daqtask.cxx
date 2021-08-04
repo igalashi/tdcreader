@@ -40,10 +40,13 @@ public:
 	int get_id() {return m_id;};
 	void clear_is_done() {m_is_done = false;};
 	bool is_done() {return m_is_done;};
+	void clear_is_good() {m_is_good = true;};
+	bool is_good() {return m_is_good;};
 protected:
 	static int c_state;
 	int m_id;
 	bool m_is_done;
+	bool m_is_good;
 	std::thread *m_sm;
 	static std::mutex *c_dtmtx;
 

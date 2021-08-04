@@ -9,7 +9,7 @@
 #include <sstream>
 #include <iomanip>
 
-char *filename(int id)
+char *dtfilename(const char *name)
 {
 	static char fname[128];
 	
@@ -25,8 +25,8 @@ char *filename(int id)
 		<< std::setw(2) << lt->tm_sec;
 
 	std::ostringstream oss;
-	oss << "tdc"
-		<< std::setfill('0') << std::setw(4) << id << std::setfill(' ') 
+	oss << name
+		//<< std::setfill('0') << std::setw(4) << id << std::setfill(' ') 
 		<< "_"
 		<< (lt->tm_year + 1900) << ossdaytime.str();
 
