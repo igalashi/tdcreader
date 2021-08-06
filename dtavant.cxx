@@ -3,6 +3,7 @@
  */
 
 #include <iostream>
+#include <iomanip>
 #include <thread>
 #include <atomic>
 
@@ -18,8 +19,8 @@
 
 
 
-//const int bufsize = 1024 * sizeof(unsigned int);
-const int default_bufsize = 128;
+const int default_bufsize = 1024 * sizeof(unsigned int);
+const int default_quelen = 10000;
 
 std::atomic<int> g_avant_depth(0);
 
@@ -44,6 +45,8 @@ public:
 	DTavant(int, char *, int, bool);
 	int get_bufsize() {return m_bufsize;};
 	void set_bufsize(int size) {m_bufsize = size;};
+	int get_quelen() {return m_quelen;};
+	void set_quelen(int len) {m_quelen = len;};
 protected:
 	virtual int st_init(void *) override;
 	virtual int st_idle(void *) override;
@@ -54,11 +57,12 @@ private:
 	kol::TcpClient *tcp;
 	bool m_is_dummy;
 	int m_bufsize;
+	int m_quelen;
 };
 
 DTavant::DTavant(int i, char *host, int port, bool is_dummy)
 	: DAQTask(i), m_host(host), m_port(port),
-		m_is_dummy(is_dummy), m_bufsize(default_bufsize)
+		m_is_dummy(is_dummy), m_bufsize(default_bufsize), m_quelen(default_quelen)
 {
 }
 
@@ -110,10 +114,13 @@ int DTavant::st_running(void *context)
 	zmq::socket_t sender(
 		*(reinterpret_cast<zmq::context_t *>(context)),
 		ZMQ_PUSH);
-	//sender.setsockopt(ZMQ_SNDBUF, m_bufsize +  2);
+	//sender.setsockopt(ZMQ_SNDBUF, m_bufsize + 8); //ireruto tcp no toki osokunaru ??
 	//sender.setsockopt(ZMQ_SNDHWM, 512*1024);
+	sender.setsockopt(ZMQ_SNDHWM, m_quelen);
+	#if 1
 	std::cout << "avant: ZMQ_SNDBUF : " << sender.getsockopt<int>(ZMQ_SNDBUF) << std::endl;
 	std::cout << "avant: ZMQ_SNDHWM : " << sender.getsockopt<int>(ZMQ_SNDHWM) << std::endl;
+	#endif
 
 	sender.connect(g_snd_endpoint);
 
@@ -167,7 +174,9 @@ int DTavant::st_running(void *context)
 	
 		#if 1
 		if ((segnum % 1000) == 0) {
-			std::cout << "\rR:" << g_avant_depth << "   " << std::flush;
+			std::lock_guard<std::mutex> lock(*c_dtmtx);
+			std::cout << "\rLSQue: "
+				<< std::setw(4) << g_avant_depth << "   " << std::flush;
 		}
 		#endif
 

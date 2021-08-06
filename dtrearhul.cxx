@@ -21,7 +21,7 @@
 //const char* g_rec_endpoint = "ipc://./hello";
 //const char* g_rec_endpoint = "inproc://hello";
 
-const char* fnhead = "tdc";
+const char* fnhead = "hul";
 
 
 class DTrear : public DAQTask
@@ -36,6 +36,7 @@ protected:
 	virtual int st_idle(void *) override;
 	virtual int st_running(void *) override;
 private:
+	bool fivecmp(char *, char, char, char, char, char);
 	int write_data(char*, int);
 	int m_nspill;
 };
@@ -220,9 +221,43 @@ int DTrear::st_running(void *context)
 
 }
 
+bool DTrear::fivecmp(char *val, char v0, char v1, char v2, char v3, char v4)
+{
+	#if 0
+	{
+	std::lock_guard<std::mutex> lock(*c_dtmtx);
+	std::cout << "# " << std::hex
+	<< (static_cast<unsigned int>(val[0]) & 0xff) << " "
+	<< (static_cast<unsigned int>(val[1]) & 0xff) << " "
+	<< (static_cast<unsigned int>(val[2]) & 0xff) << " "
+	<< (static_cast<unsigned int>(val[3]) & 0xff) << " "
+	<< (static_cast<unsigned int>(val[4]) & 0xff) << " "
+	<< " : "
+	<< (static_cast<unsigned int>(v0) & 0xff) << " "
+	<< (static_cast<unsigned int>(v1) & 0xff) << " "
+	<< (static_cast<unsigned int>(v2) & 0xff) << " "
+	<< (static_cast<unsigned int>(v3) & 0xff) << " "
+	<< (static_cast<unsigned int>(v4) & 0xff) << " "
+	<< std::endl;
+
+	}
+	#endif
+
+
+	if (  (val[0] == v0) 
+	   && (val[1] == v1)
+	   && (val[2] == v2)
+	   && (val[3] == v3)
+	   && (val[4] == v4)) {
+		return true;
+	} else {
+		return false;
+	}
+}
+	
 int DTrear::write_data(char *cdata, int data_size)
 {
-	unsigned int *data = reinterpret_cast<unsigned int *>(cdata);
+	//unsigned int *data = reinterpret_cast<unsigned int *>(cdata);
 
 	static int spillcount = 0;
 	static int wcount = 0;
@@ -241,16 +276,17 @@ int DTrear::write_data(char *cdata, int data_size)
 
 	while (data_size > 0) {
 		bool is_spill_end = false;
-		for (unsigned int i = 0 ; i < (data_size / sizeof(unsigned int)) ; i++) {
-			if (data[i] == 0xffff5555) {
+		for (int i = 0 ; i < (data_size - 5 + 1) ; i++) {
+			if (fivecmp(&(cdata[i]),
+				0x40, 0x00, 0x00, 0xff, 0xff)) {
 				time_t now = time(NULL);
-				ofs.write(reinterpret_cast<char *>(data),
-					sizeof(unsigned int) * (i + 1));
+				int len = i + 5;
+				ofs.write(cdata, len);
 				ofs.write(reinterpret_cast<char *>(&now), sizeof(time_t));
-				data = &(data[i + 1]);
-				data_size = data_size - ((i + 1) * sizeof(unsigned int));
+				cdata += len;
+				data_size = data_size - len;
 				spillcount++;
-				wcount += sizeof(unsigned int) * (i + 1) + sizeof(time_t);
+				wcount += (i + 5) + sizeof(time_t);
 
 				if ((spillcount % m_nspill) == 0) {
 					char wfname[128];
@@ -283,7 +319,7 @@ int DTrear::write_data(char *cdata, int data_size)
 			}
 		}
 		if (! is_spill_end) {
-			ofs.write(reinterpret_cast<char *>(data), data_size);
+			ofs.write(cdata, data_size);
 			wcount += data_size;
 			break;
 		}

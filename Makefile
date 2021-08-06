@@ -13,7 +13,7 @@ INCLUDES = -Ikol
 #LIBS = kol/kolsocket.o kol/koltcp.o
 LIBS = -Lkol -lkol
 
-PROGS = fe be dummy dummycheck thtdcreader benb daqtask dtmain
+PROGS = fe be dummy dummycheck thtdcreader benb daqtask dtmain dummyhul hulssm
 all: $(PROGS)
 
 fe: fe.cxx zportname.cxx kol/libkol.a
@@ -40,10 +40,16 @@ daqtask: daqtask.cxx
 dtmain: dtmain.cxx daqtask.cxx dtavant.cxx dtrear.cxx dtfilename.cxx
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
 
+hulssm: dtmain.cxx daqtask.cxx dtavant.cxx dtrearhul.cxx dtfilename.cxx
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -D HUL -o $@ $< $(CXXLIBS) $(LIBS)
+
 dummy: dummy.cxx
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
 
 dummycheck: dummycheck.cxx
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
+
+dummyhul: dummyhul.cxx
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $< $(CXXLIBS) $(LIBS)
 
 
@@ -54,4 +60,4 @@ clean:
 	rm -f $(PROGS)
 
 cleandata:
-	rm -f tdc*.dat
+	rm -f tdc*.dat hul*.dat

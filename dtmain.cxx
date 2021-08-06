@@ -5,16 +5,20 @@
 #include <iostream>
 #include <cstring>
 
-const char* g_snd_endpoint = "tcp://localhost:5558";
+//const char* g_snd_endpoint = "tcp://localhost:5558";
 //const char* g_snd_endpoint = "ipc://./hello";
-//const char* g_snd_endpoint = "inproc://hello";
-const char* g_rec_endpoint = "tcp://*:5558";
+const char* g_snd_endpoint = "inproc://hello";
+//const char* g_rec_endpoint = "tcp://*:5558";
 //const char* g_rec_endpoint = "ipc://./hello";
-//const char* g_rec_endpoint = "inproc://hello";
+const char* g_rec_endpoint = "inproc://hello";
 
 #include "daqtask.cxx"
 #include "dtavant.cxx"
+#ifdef HUL
+#include "dtrearhul.cxx"
+#else
 #include "dtrear.cxx"
+#endif
 
 
 
@@ -27,6 +31,7 @@ int main(int argc, char* argv[])
 	bool is_dummy = false;
 	int buf_size = 0;
 	int nspill = 0;
+	int quelen = 0;
 
 	for (int i = 1 ; i < argc ; i++) {
 		std::string sargv(argv[i]);
@@ -38,6 +43,9 @@ int main(int argc, char* argv[])
 		}
 		if ((sargv == "-b")  && (argc > i)) {
 			buf_size = strtol(argv[i + 1], NULL, 0);
+		}
+		if ((sargv == "-q")  && (argc > i)) {
+			quelen = strtol(argv[i + 1], NULL, 0);
 		}
 		if ((sargv == "-n")  && (argc > i)) {
 			nspill = strtol(argv[i + 1], NULL, 0);
@@ -61,6 +69,7 @@ int main(int argc, char* argv[])
 	DTrear  *rear  = new DTrear(2);
 
 	if (buf_size > 0) avant->set_bufsize(buf_size);
+	if (quelen > 0) avant->set_quelen(quelen);
 	if (nspill > 0) rear->set_nspill(nspill);
 
 	std::vector<DAQTask*> tasks;
@@ -80,15 +89,21 @@ int main(int argc, char* argv[])
 	if (is_good_init) {
 
 		avant->set_state(SM_IDLE);
-		sleep(1);
+		usleep(100*1000);
 		avant->set_state(SM_RUNNING);
 		//sleep(1);
-		{
+		while (true) {
 			std::string oneline;
 			std::cin >> oneline;
+			if (oneline == "run") avant->set_state(SM_RUNNING);
+			if (oneline == "idle") avant->set_state(SM_IDLE);
+			if (oneline == "end") break;;
+			if (oneline == "stop") break;;
+			if (oneline == "exit") break;;
+			if (oneline == "q") break;;
 		}
 		avant->set_state(SM_IDLE);
-		sleep(1);
+		usleep(100*1000);
 		avant->set_state(SM_END);
 
 	} else {
