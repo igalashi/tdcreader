@@ -160,7 +160,7 @@ int DTrear::st_running(void *context)
 		unsigned int *head = reinterpret_cast<unsigned int *>(message.data());
 		//unsigned int *data = head + 1;
 		char *cdata =  reinterpret_cast<char *>(head + 1);
-		unsigned int id = (*head) & 0x000000ff;
+		//unsigned int id = (*head) & 0x000000ff;
 		unsigned int data_size = message.size() - sizeof(unsigned int);
 
 		#if 0
@@ -181,6 +181,7 @@ int DTrear::st_running(void *context)
 		}
 		#endif
 
+		#if 0
 		bool is_new = true;
 		for (unsigned int i = 0 ; i < buf.size() ; i++) {
 			if (id == buf[i].id) {
@@ -194,6 +195,7 @@ int DTrear::st_running(void *context)
 			node.discard = 0;
 			buf.push_back(node);
 		}
+		#endif
 
 		write_data(cdata, data_size);
 
